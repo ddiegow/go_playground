@@ -1,6 +1,9 @@
 package gol
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 // GAME OF LIFE - SERIAL IMPLEMENTATION
 // TODO: check func not working correctly
@@ -98,10 +101,13 @@ func (b *board) check() {
 	for i := range b.b {
 		for j := range b.b[i] {
 			count := b.countAround(b.b[i][j])
-			if count >= 2 || count < 4 {
+			// the all-important three rules!
+			if b.b[i][j].current && (count < 2 || count > 3) { // if cell is alive
+				b.b[i][j].next = false
+			} else if !b.b[i][j].current && count == 3 {
 				b.b[i][j].next = true
 			} else {
-				b.b[i][j].next = false
+				b.b[i][j].next = b.b[i][j].current
 			}
 		}
 	}
@@ -128,15 +134,23 @@ func (b *board) draw() {
 		fmt.Printf("\n")
 
 	}
+	fmt.Printf("\n")
 }
 func Run() {
 	var b board
-	b.init(3)
+	b.init(10)
 	b.activate(position{0, 1})
 	b.activate(position{1, 1})
 	b.activate(position{2, 1})
-	b.draw()
-	b.check()
-	b.update()
-	b.draw()
+	b.activate(position{2, 2})
+	b.activate(position{3, 2})
+	b.activate(position{4, 2})
+	b.activate(position{4, 4})
+	for {
+		fmt.Print("\033[H\033[2J")
+		b.draw()
+		b.check()
+		b.update()
+		time.Sleep(time.Millisecond * 250)
+	}
 }
