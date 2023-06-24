@@ -2,7 +2,6 @@ package gol
 
 import (
 	"fmt"
-	"runtime"
 	"sync"
 	"time"
 )
@@ -19,6 +18,7 @@ type cellCon struct {
 	current bool
 	next    bool
 	pos     positionCon
+	around  []*cellCon
 }
 
 func (pos *positionCon) initCon(x int, y int) {
@@ -38,19 +38,39 @@ type boardCon struct {
 	bottom int
 }
 
-func (b *boardCon) init(size int) {
+func (b *boardCon) initCon(size int) {
+	start := time.Now()
 	b.n = size
 	b.b = make([][]cellCon, b.n)
+	b.left = -1
+	b.top = -1
+	b.right = b.n
+	b.bottom = b.n
+	around := []positionCon{
+		{-1, 0},
+		{-1, 1},
+		{0, 1},
+		{1, 1},
+		{1, 0},
+		{1, -1},
+		{0, -1},
+		{-1, -1},
+	}
+
 	for i := range b.b {
 		b.b[i] = make([]cellCon, b.n)
 		for j := range b.b[i] {
 			b.b[i][j].pos.initCon(j, i)
+			for k := range around {
+				a := b.getCellCon(b.b[i][j].pos.addCon(around[k]))
+				if a == nil {
+					continue
+				}
+				b.b[i][j].around = append(b.b[i][j].around, a)
+			}
 		}
 	}
-	b.left = -1
-	b.top = size
-	b.right = size
-	b.bottom = -1
+	fmt.Printf("Init duration: %d\n", time.Since(start))
 }
 func (b *boardCon) activateCon(p positionCon) {
 	c := b.getCellCon(p)
@@ -79,28 +99,14 @@ func (b *boardCon) getCellCon(p positionCon) *cellCon {
 
 func (b *boardCon) countAround(c cellCon) int {
 	totalCount := 0
-	around := []positionCon{
-		{-1, 0},
-		{-1, 1},
-		{0, 1},
-		{1, 1},
-		{1, 0},
-		{1, -1},
-		{0, -1},
-		{-1, -1},
-	}
-	for i := range around {
-		a := b.getCellCon(c.pos.addCon(around[i]))
-		if a == nil {
-			continue
-		}
-		if a.current == true {
+	for i := range c.around {
+		if c.around[i].current == true {
 			totalCount++
 		}
 	}
 	return totalCount
 }
-func (b *boardCon) checkRow(i int, c *chan bool) {
+func (b *boardCon) checkRow(i int) {
 	for j := range b.b[i] {
 		count := b.countAround(b.b[i][j])
 		// the all-important three rules!
@@ -112,32 +118,31 @@ func (b *boardCon) checkRow(i int, c *chan bool) {
 			b.b[i][j].next = b.b[i][j].current
 		}
 	}
-	*c <- true
 }
 func (b *boardCon) checkCon() {
-	sem := make(chan int, runtime.NumCPU()) // basic semaphore to use as many threads are there are cores
-
+	start := time.Now()
+	sem := make(chan int, 3) // basic semaphore to use as many threads are there are cores
 	var wg sync.WaitGroup
 	for i := range b.b {
 		sem <- 1 // wait for the semaphore
 		wg.Add(1)
 		go func(rowNum int) {
-			c := make(chan bool)
-			go b.checkRow(rowNum, &c)
-			<-c
-			close(c)
+			b.checkRow(rowNum)
 			wg.Done()
 			<-sem // signal the semaphore
 		}(i)
 	}
 	wg.Wait() // wait for all threads to finish
+	fmt.Printf("Check duration: %d\n", time.Since(start))
 }
 func (b *boardCon) updateCon() {
+	start := time.Now()
 	for i := range b.b {
 		for j := range b.b[i] {
 			b.b[i][j].current = b.b[i][j].next
 		}
 	}
+	fmt.Printf("Update duration: %d\n", time.Since(start))
 }
 
 func (b *boardCon) drawCon() {
@@ -158,7 +163,7 @@ func (b *boardCon) drawCon() {
 }
 func RunCon(n int) {
 	var b boardCon
-	b.init(n)
+	b.initCon(n)
 	b.activateCon(positionCon{0, 1})
 	b.activateCon(positionCon{1, 1})
 	b.activateCon(positionCon{2, 1})

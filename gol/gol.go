@@ -35,6 +35,7 @@ type board struct {
 }
 
 func (b *board) init(size int) {
+	start := time.Now()
 	b.n = size
 	b.b = make([][]cell, b.n)
 	for i := range b.b {
@@ -47,6 +48,7 @@ func (b *board) init(size int) {
 	b.top = size
 	b.right = size
 	b.bottom = -1
+	fmt.Printf("Init duration: %d\n", time.Since(start))
 }
 func (b *board) activate(p position) {
 	c := b.getCell(p)
@@ -98,6 +100,7 @@ func (b *board) countAround(c cell) int {
 }
 
 func (b *board) check() {
+	start := time.Now()
 	for i := range b.b {
 		for j := range b.b[i] {
 			count := b.countAround(b.b[i][j])
@@ -111,13 +114,16 @@ func (b *board) check() {
 			}
 		}
 	}
+	fmt.Printf("Check duration: %d\n", time.Since(start))
 }
 func (b *board) update() {
+	start := time.Now()
 	for i := range b.b {
 		for j := range b.b[i] {
 			b.b[i][j].current = b.b[i][j].next
 		}
 	}
+	fmt.Printf("Update duration: %d\n", time.Since(start))
 }
 
 func (b *board) draw() {
