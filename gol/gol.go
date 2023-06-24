@@ -6,7 +6,7 @@ import (
 )
 
 // GAME OF LIFE - SERIAL IMPLEMENTATION
-// TODO: check func not working correctly
+
 type position struct {
 	x int
 	y int
@@ -136,9 +136,9 @@ func (b *board) draw() {
 	}
 	fmt.Printf("\n")
 }
-func Run() {
+func Run(n int) {
 	var b board
-	b.init(10)
+	b.init(n)
 	b.activate(position{0, 1})
 	b.activate(position{1, 1})
 	b.activate(position{2, 1})
@@ -146,11 +146,17 @@ func Run() {
 	b.activate(position{3, 2})
 	b.activate(position{4, 2})
 	b.activate(position{4, 4})
-	for {
-		fmt.Print("\033[H\033[2J")
-		b.draw()
+	count := 0
+	average := int64(0)
+	for i := 0; i < 100; i++ {
+		//b.draw()
+		start := time.Now()
 		b.check()
 		b.update()
-		time.Sleep(time.Millisecond * 250)
+		timeElapsed := time.Since(start)
+		count++
+		average += timeElapsed.Nanoseconds()
+		time.Sleep(time.Millisecond * 25)
 	}
+	fmt.Printf("Serial average: %f\n", float64(average/int64(count)))
 }
