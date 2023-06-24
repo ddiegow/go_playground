@@ -148,7 +148,7 @@ func Run(n int) {
 	b.activate(position{4, 4})
 	count := 0
 	average := int64(0)
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 1; i++ {
 		//b.draw()
 		start := time.Now()
 		b.check()
