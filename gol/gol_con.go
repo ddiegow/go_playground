@@ -2,13 +2,14 @@ package gol
 
 import (
 	"fmt"
+	"runtime"
 	"sync"
 	"time"
 )
 
 // GAME OF LIFE - SIMPLE CONCURRENT IMPLEMENTATION
-// This implementation is about 3 times faster than the serial one
-// TODO: maybe use pointers within the cell struct to point to the ones around it
+// This implementation is about 4 times faster than the serial one (on a moderately powerful computer)
+// TODO: compare implementing the cells around as pointers idea vs the old calculation one. Could be that the current double access to memory required by the pointers makes it somewhat slower than the original
 
 type positionCon struct {
 	x int
@@ -121,27 +122,36 @@ func (b *boardCon) checkRow(i int) {
 }
 func (b *boardCon) checkCon() {
 	start := time.Now()
-	sem := make(chan int, 3) // basic semaphore to use as many threads are there are cores
+	sem := make(chan int, runtime.NumCPU()) // basic semaphore to use as many threads are there are cores
 	var wg sync.WaitGroup
 	for i := range b.b {
 		sem <- 1 // wait for the semaphore
 		wg.Add(1)
-		go func(rowNum int) {
+		go func(rowNum int, w *sync.WaitGroup) {
 			b.checkRow(rowNum)
-			wg.Done()
+			w.Done()
 			<-sem // signal the semaphore
-		}(i)
+		}(i, &wg)
 	}
 	wg.Wait() // wait for all threads to finish
 	fmt.Printf("Check duration: %d\n", time.Since(start))
 }
 func (b *boardCon) updateCon() {
+	sem := make(chan int, runtime.NumCPU())
+	var wg sync.WaitGroup
 	start := time.Now()
 	for i := range b.b {
-		for j := range b.b[i] {
-			b.b[i][j].current = b.b[i][j].next
-		}
+		sem <- 1 // wait for the semaphore
+		wg.Add(1)
+		go func(col int, w *sync.WaitGroup) {
+			for j := range b.b[i] {
+				b.b[i][j].current = b.b[i][j].next
+			}
+			<-sem
+			w.Done()
+		}(i, &wg)
 	}
+	wg.Wait()
 	fmt.Printf("Update duration: %d\n", time.Since(start))
 }
 
@@ -173,7 +183,7 @@ func RunCon(n int) {
 	b.activateCon(positionCon{4, 4})
 	average := int64(0)
 	count := 0
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 5; i++ {
 		//fmt.Print("\033[H\033[2J")
 		//b.drawCon()
 

@@ -4,8 +4,8 @@ import "playground/gol"
 
 func main() {
 
-	//gol.Run(10000)
-	gol.RunCon(10000)
+	gol.Run(5000)
+	gol.RunCon(5000)
 	//pointers.Run()
 
 }
