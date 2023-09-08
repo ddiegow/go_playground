@@ -155,13 +155,6 @@ func (s *Server) resetChans() {
 	s.votedChan = make(chan bool)
 }
 
-// Define an RPC method that sends a command
-func (s *Server) sendCommand(args *CommandArgs, reply *CommandReply) error {
-	fmt.Printf("[Server #%s] received command %s\n", s.myId, args.Command)
-	reply.Ok = true
-	return nil
-}
-
 // Define a struct to represent the arguments of the SendCommand method.
 type CommandArgs struct {
 	Command string
@@ -210,19 +203,53 @@ func (s *Server) sendRPC(rpcName string, args *CommandArgs, reply *CommandReply,
 	}
 }
 
-func (s *Server) broadcast(command string) {
+func (s *Server) broadcastRequestVote() {
 	for i := 0; i < 3; i++ { // for each server
 		if strconv.Itoa(i) == s.myId {
 			continue
 		}
 		address := "localhost:" + strconv.Itoa(s.ports[i])
 		// Prepare the arguments for the SendCommand method.
-		args := CommandArgs{Command: command}
+		args := RequestVoteArgs{}
 		// Prepare the reply for the SendCommand method
-		reply := CommandReply{}
+		reply := RequestVoteReply{}
 		// Send the rpc
-		s.sendRPC("SendCommand", &args, &reply, address, i)
-		// Inform user of reply
-		fmt.Printf("[Server #%s] received Ok value %v after sending command %s to server #%d\n", s.myId, reply.Ok, command, i)
+		client, err := rpc.Dial("tcp", address)
+		if err != nil {
+			fmt.Println("Error connecting to server:", err)
+			return
+		}
+		defer client.Close()
+		callString := "Server_" + strconv.Itoa(i) + "." + "RequestVote"
+		err = client.Call(callString, &args, &reply)
+		if err != nil {
+			fmt.Println("Error calling remote method:", err)
+			return
+		}
+	}
+}
+func (s *Server) broadcastAppendEntries() {
+	for i := 0; i < 3; i++ { // for each server
+		if strconv.Itoa(i) == s.myId {
+			continue
+		}
+		address := "localhost:" + strconv.Itoa(s.ports[i])
+		// Prepare the arguments for the SendCommand method.
+		args := AppendEntriesArgs{}
+		// Prepare the reply for the SendCommand method
+		reply := AppendEntriesReply{}
+		// Send the rpc
+		client, err := rpc.Dial("tcp", address)
+		if err != nil {
+			fmt.Println("Error connecting to server:", err)
+			return
+		}
+		defer client.Close()
+		callString := "Server_" + strconv.Itoa(i) + "." + "AppendEntries"
+		err = client.Call(callString, &args, &reply)
+		if err != nil {
+			fmt.Println("Error calling remote method:", err)
+			return
+		}
 	}
 }
