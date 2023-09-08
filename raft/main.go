@@ -21,12 +21,12 @@ func main() {
 		}
 	}
 	for i := 0; i < 3; i++ {
-		go servers[i].Listen()
+		go servers[i].listen()
 	}
 	time.Sleep(2 * time.Second)
-	servers[0].Broadcast("hello")
-	servers[1].Broadcast("goodbye")
-	servers[2].Broadcast("hello again!")
+	servers[0].broadcast("hello")
+	servers[1].broadcast("goodbye")
+	servers[2].broadcast("hello again!")
 	// Register the Calculator object with the RPC server.
 
 	time.Sleep(3 * time.Second)

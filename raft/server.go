@@ -6,6 +6,13 @@ import (
 	"net/rpc"
 	"strconv"
 	"sync"
+	"time"
+)
+
+const (
+	FOLLOWER = iota
+	CANDIDATE
+	LEADER
 )
 
 // Define a struct that will be used for RPC.
@@ -24,7 +31,13 @@ type Server struct {
 	nextIndex  []int // for each server, index of the next log entry to send to that server (initialized to leader last log index + 1)
 	matchIndex []int // for each server, index of highest log entry known to be replicated on server (initialized to 0, increases monotonically)
 
-	mu sync.Mutex
+	serverState int
+	mu          sync.Mutex
+
+	hearbeatChan    chan bool // channel to receive heartbeats
+	votedChan       chan bool // channel to indicate we have just vote
+	electionWonChan chan bool // channel to indicate we won the election and need to convert to leader
+	stepDownChan    chan bool // channel to let the leader know it has to step down
 }
 
 // we have received a vote request from another server
@@ -74,12 +87,58 @@ func (s *Server) logUpToDate(lastLogTerm int, lastLogIndex int) bool {
 }
 
 // This function coordinates the changes from one state to another.
-func (s *Server) Coordinate() {
+func (s *Server) coordinate() {
+	s.mu.Lock()
+	currentState := s.serverState
+	s.mu.Unlock()
+	switch currentState {
+	case FOLLOWER:
+		select {
+		case <-s.votedChan:
+		case <-s.hearbeatChan:
+		case <-time.After(3 * time.Second): // 3 seconds have passed without a heartbeat
+			// start election
+
+		}
+	case CANDIDATE:
+		select {
+		case <-s.hearbeatChan: // we got a heartbeat, so convert to follower
+		case <-s.electionWonChan: // we won the election, so convert to leader
+		case <-time.After(3 * time.Second): // 3 seconds have passed without any results
+			// start new election
+		}
+	case LEADER:
+		select {
+		case <-s.stepDownChan: // not the leader anymore, so step down
+		// (this is called after stepping down, so next switch iteration it will go into follower block)
+		case <-time.After(50 * time.Millisecond):
+			// broadcast heartbeats
+		}
+	}
+}
+
+// follower -> candidate transition
+func (s *Server) convertToCandidate() {
+
+}
+
+// candidate or leader -> follwer transition
+func (s *Server) convertToFollower() {
+
+}
+
+// candidate -> leader transition
+func (s *Server) convertToLeader() {
+
+}
+
+// start an election
+func (s *Server) startElection() {
 
 }
 
 // Define an RPC method that sends a command
-func (s *Server) SendCommand(args *CommandArgs, reply *CommandReply) error {
+func (s *Server) sendCommand(args *CommandArgs, reply *CommandReply) error {
 	fmt.Printf("[Server #%s] received command %s\n", s.myId, args.Command)
 	reply.Ok = true
 	return nil
@@ -93,7 +152,7 @@ type CommandReply struct {
 	Ok bool
 }
 
-func (s *Server) Listen() {
+func (s *Server) listen() {
 
 	// Create a listener for incoming connections.
 	listener, err := net.Listen("tcp", ":"+strconv.Itoa(s.myPort))
@@ -117,7 +176,7 @@ func (s *Server) Listen() {
 		go rpc.ServeConn(conn)
 	}
 }
-func (s *Server) SendRPC(rpcName string, args *CommandArgs, reply *CommandReply, address string, snumber int) {
+func (s *Server) sendRPC(rpcName string, args *CommandArgs, reply *CommandReply, address string, snumber int) {
 
 	client, err := rpc.Dial("tcp", address)
 	if err != nil {
@@ -133,7 +192,7 @@ func (s *Server) SendRPC(rpcName string, args *CommandArgs, reply *CommandReply,
 	}
 }
 
-func (s *Server) Broadcast(command string) {
+func (s *Server) broadcast(command string) {
 	for i := 0; i < 3; i++ { // for each server
 		if strconv.Itoa(i) == s.myId {
 			continue
@@ -144,7 +203,7 @@ func (s *Server) Broadcast(command string) {
 		// Prepare the reply for the SendCommand method
 		reply := CommandReply{}
 		// Send the rpc
-		s.SendRPC("SendCommand", &args, &reply, address, i)
+		s.sendRPC("SendCommand", &args, &reply, address, i)
 		// Inform user of reply
 		fmt.Printf("[Server #%s] received Ok value %v after sending command %s to server #%d\n", s.myId, reply.Ok, command, i)
 	}
