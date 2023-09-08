@@ -97,15 +97,20 @@ func (s *Server) coordinate() {
 		case <-s.votedChan:
 		case <-s.hearbeatChan:
 		case <-time.After(3 * time.Second): // 3 seconds have passed without a heartbeat
+			// convert to candidate
+			s.convertToCandidate()
 			// start election
+			s.startElection()
 
 		}
 	case CANDIDATE:
 		select {
 		case <-s.hearbeatChan: // we got a heartbeat, so convert to follower
 		case <-s.electionWonChan: // we won the election, so convert to leader
+			s.convertToLeader()
 		case <-time.After(3 * time.Second): // 3 seconds have passed without any results
 			// start new election
+			s.startElection()
 		}
 	case LEADER:
 		select {
@@ -119,22 +124,35 @@ func (s *Server) coordinate() {
 
 // follower -> candidate transition
 func (s *Server) convertToCandidate() {
-
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.resetChans()
 }
 
 // candidate or leader -> follwer transition
 func (s *Server) convertToFollower() {
-
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.resetChans()
 }
 
 // candidate -> leader transition
 func (s *Server) convertToLeader() {
-
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.resetChans()
 }
 
 // start an election
 func (s *Server) startElection() {
+}
 
+// restart all channels. must hold lock when accessing this function
+func (s *Server) resetChans() {
+	s.electionWonChan = make(chan bool)
+	s.hearbeatChan = make(chan bool)
+	s.stepDownChan = make(chan bool)
+	s.votedChan = make(chan bool)
 }
 
 // Define an RPC method that sends a command
